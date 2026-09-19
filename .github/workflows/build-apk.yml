@@ -5,38 +5,31 @@ on:
   push:
     branches: [main]
 
-jobs:name: Build APK
-
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
-
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
       - name: Setup Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
 
       - name: Extract ZIP
         run: |
           mkdir -p project
-          ZIP=$(find . -maxdepth 2 -type f -name "*.zip" | head -1)
-          test -n "$ZIP"
-          unzip -q "$ZIP" -d project
+          ZIP=$(find . -maxdepth 1 -type f -iname "*.zip" | head -1)
+          test -n "$ZIP" || { echo "ZIP file not found"; exit 1; }
+          unzip -o "$ZIP" -d project
 
       - name: Find Gradle project
         run: |
           G=$(find project -type f -name gradlew | head -1)
-          test -n "$G"
+          test -n "$G" || { echo "gradlew not found in ZIP"; exit 1; }
           chmod +x "$G"
           echo "GRADLEW=$G" >> "$GITHUB_ENV"
 
@@ -45,32 +38,9 @@ jobs:
           cd "$(dirname "$GRADLEW")"
           ./gradlew assembleDebug --no-daemon
 
-      - name: APK
+      - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: Archana-AI-APK
-          path: project/**/build/outputs/apk/**/*.apk
-  build:
-    runs-on: ubuntu-latest
-
-    steps:
-      - uses: actions/checkout@v4
-
-      - name: Extract ZIP
-        run: |
-          mkdir project
-          unzip -o "$(find . -maxdepth 1 -name '*.zip' | head -1)" -d project
-
-      - name: Build
-        run: |
-          G=$(find project -name gradlew | head -1)
-          test -n "$G"
-          chmod +x "$G"
-          cd "$(dirname "$G")"
-          ./gradlew assembleDebug --no-daemon
-
-      - name: APK
-        uses: actions/upload-artifact@v4
-        with:
-          name: Archana-AI-APK
-          path: project/**/build/outputs/apk/**/*.apk
+          name: APK
+          path: |
+            project/**/build/outputs/apk/**/*.apk
